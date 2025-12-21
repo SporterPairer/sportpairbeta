@@ -6,15 +6,20 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const emailSchema = z.string().email('Ongeldig e-mailadres');
 const passwordSchema = z.string().min(6, 'Wachtwoord moet minimaal 6 tekens zijn');
+const MIN_AGE = 16;
+const currentYear = new Date().getFullYear();
+const birthYears = Array.from({ length: 100 }, (_, i) => currentYear - MIN_AGE - i);
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [birthYear, setBirthYear] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -67,12 +72,25 @@ const Auth = () => {
         return;
       }
 
+      if (!birthYear) {
+        toast.error('Selecteer je geboortejaar');
+        setLoading(false);
+        return;
+      }
+
+      const age = currentYear - parseInt(birthYear);
+      if (age < MIN_AGE) {
+        toast.error(`Je moet minimaal ${MIN_AGE} jaar oud zijn om te registreren`);
+        setLoading(false);
+        return;
+      }
+
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
-          data: { name }
+          data: { name, age }
         }
       });
 
@@ -103,15 +121,31 @@ const Auth = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
-              <div>
-                <Input
-                  type="text"
-                  placeholder="Je naam"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required={!isLogin}
-                />
-              </div>
+              <>
+                <div>
+                  <Input
+                    type="text"
+                    placeholder="Je naam"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required={!isLogin}
+                  />
+                </div>
+                <div>
+                  <Select value={birthYear} onValueChange={setBirthYear}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Geboortejaar" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-48">
+                      {birthYears.map((year) => (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
             )}
             <div>
               <Input

@@ -133,7 +133,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_safe_age_range: {
+        Args: { _user_age: number }
+        Returns: {
+          max_age: number
+          min_age: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
