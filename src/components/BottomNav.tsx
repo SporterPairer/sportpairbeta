@@ -1,4 +1,4 @@
-import { Home, Trophy, Users, Activity } from 'lucide-react';
+import { Home, Trophy, Users, Activity, User, Compass } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BottomNavProps {
@@ -8,9 +8,10 @@ interface BottomNavProps {
 
 const navItems = [
   { id: 'home', label: 'Home', icon: Home },
+  { id: 'discover', label: 'Ontdek', icon: Compass },
   { id: 'clubs', label: 'Clubs', icon: Users },
-  { id: 'leaderboard', label: 'Ranglijst', icon: Trophy },
-  { id: 'feed', label: 'Feed', icon: Activity },
+  { id: 'leaderboard', label: 'Rang', icon: Trophy },
+  { id: 'profile', label: 'Profiel', icon: User },
 ];
 
 export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
@@ -33,15 +34,15 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
               )}
             >
               <div className={cn(
-                "flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200",
+                "flex h-9 w-9 items-center justify-center rounded-xl transition-all duration-200",
                 isActive && "gradient-primary shadow-glow"
               )}>
                 <Icon className={cn(
-                  "h-5 w-5 transition-colors",
+                  "h-4 w-4 transition-colors",
                   isActive && "text-primary-foreground"
                 )} />
               </div>
-              <span className="text-xs font-medium">{item.label}</span>
+              <span className="text-[10px] font-medium">{item.label}</span>
             </button>
           );
         })}
