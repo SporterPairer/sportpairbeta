@@ -2,18 +2,22 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { MatchDialog } from '@/components/MatchDialog';
-import { currentUser, mockClubs } from '@/data/mockData';
+import { mockClubs } from '@/data/mockData';
+import { useAuth } from '@/hooks/useAuth';
 import { Zap, Users, Trophy, TrendingUp } from 'lucide-react';
 
 export function HomeTab() {
   const [matchDialogOpen, setMatchDialogOpen] = useState(false);
+  const { profile } = useAuth();
+
+  const displayName = profile?.name?.split(' ')[0] || 'Gebruiker';
 
   return (
     <div className="space-y-6 pb-24">
       {/* Header */}
       <div className="animate-slide-up">
         <p className="text-muted-foreground">Welkom terug,</p>
-        <h1 className="text-3xl font-bold">{currentUser.name.split(' ')[0]} 👋</h1>
+        <h1 className="text-3xl font-bold">{displayName} 👋</h1>
       </div>
 
       {/* Quick Match Button */}
