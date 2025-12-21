@@ -19,6 +19,17 @@ interface Profile {
   bio: string | null;
 }
 
+// Helper function to convert age to age group (privacy-preserving)
+const getAgeGroup = (age: number | null): string | null => {
+  if (age === null) return null;
+  if (age < 18) return 'Onder 18';
+  if (age <= 24) return '18-24';
+  if (age <= 34) return '25-34';
+  if (age <= 44) return '35-44';
+  if (age <= 54) return '45-54';
+  return '55+';
+};
+
 export const DiscoverTab = () => {
   const { profile } = useAuth();
   const [users, setUsers] = useState<Profile[]>([]);
@@ -135,7 +146,7 @@ export const DiscoverTab = () => {
                           {user.level}
                         </Badge>
                         {user.age && (
-                          <span className="text-sm text-muted-foreground">{user.age} jaar</span>
+                          <span className="text-sm text-muted-foreground">{getAgeGroup(user.age)}</span>
                         )}
                       </div>
                     </div>

@@ -7,6 +7,32 @@ import { SPORTS, LEVELS, AGE_GROUPS, Sport, Level, AgeGroup, Club, User } from '
 import { cn } from '@/lib/utils';
 import { Check, ChevronRight, Sparkles, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+
+// Helper function to convert age to age group (privacy-preserving)
+const getAgeGroup = (age: number | null | undefined): string => {
+  if (age === null || age === undefined) return 'Onbekend';
+  if (age < 18) return 'Onder 18';
+  if (age <= 24) return '18-24';
+  if (age <= 34) return '25-34';
+  if (age <= 44) return '35-44';
+  if (age <= 54) return '45-54';
+  return '55+';
+};
+
+// Check if a match is age-appropriate (minors can only match with users within 4 years)
+const isAgeAppropriateMatch = (userAge: number | null | undefined, matchAge: number | null | undefined): boolean => {
+  // If either age is unknown, allow the match (benefit of the doubt)
+  if (!userAge || !matchAge) return true;
+  
+  // If user is a minor (under 18), restrict matches to within 4 years
+  if (userAge < 18) {
+    return matchAge >= userAge - 4 && matchAge <= userAge + 4;
+  }
+  
+  // Adults can match with anyone 16+
+  return matchAge >= 16;
+};
 
 interface MatchDialogProps {
   open: boolean;
@@ -23,6 +49,7 @@ export function MatchDialog({ open, onOpenChange }: MatchDialogProps) {
   const [selectedClub, setSelectedClub] = useState<Club | null>(null);
   const [matchedUser, setMatchedUser] = useState<User | null>(null);
   const { toast } = useToast();
+  const { profile } = useAuth();
 
   const reset = () => {
     setStep('sport');
@@ -43,8 +70,21 @@ export function MatchDialog({ open, onOpenChange }: MatchDialogProps) {
     else if (step === 'level' && selectedLevel) setStep('age');
     else if (step === 'age' && selectedAge) setStep('club');
     else if (step === 'club' && selectedClub) {
-      // Find a random match
-      const availableMembers = selectedClub.members.filter(m => m.id !== '1');
+      // Find a random match that is age-appropriate
+      const userAge = profile?.age;
+      const availableMembers = selectedClub.members.filter(m => 
+        m.id !== '1' && isAgeAppropriateMatch(userAge, m.age)
+      );
+      
+      if (availableMembers.length === 0) {
+        toast({
+          title: "Geen geschikte matches gevonden",
+          description: "Er zijn momenteel geen leden beschikbaar die bij je leeftijdscategorie passen.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       const randomMatch = availableMembers[Math.floor(Math.random() * availableMembers.length)];
       setMatchedUser(randomMatch);
       setStep('result');
@@ -197,7 +237,7 @@ export function MatchDialog({ open, onOpenChange }: MatchDialogProps) {
               <div className="text-center">
                 <h3 className="text-xl font-bold">{matchedUser.name}</h3>
                 <p className="text-muted-foreground">
-                  {LEVELS.find(l => l.value === matchedUser.level)?.label} • {matchedUser.age} jaar
+                  {LEVELS.find(l => l.value === matchedUser.level)?.label} • {getAgeGroup(matchedUser.age)}
                 </p>
               </div>
               <div className="flex items-center gap-2 rounded-full bg-secondary px-4 py-2">
