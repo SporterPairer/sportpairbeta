@@ -1,0 +1,154 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { toast } from 'sonner';
+import { z } from 'zod';
+
+const emailSchema = z.string().email('Ongeldig e-mailadres');
+const passwordSchema = z.string().min(6, 'Wachtwoord moet minimaal 6 tekens zijn');
+
+const Auth = () => {
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        navigate('/');
+      }
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate('/');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      emailSchema.parse(email);
+      passwordSchema.parse(password);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+        setLoading(false);
+        return;
+      }
+    }
+
+    if (isLogin) {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          toast.error('Ongeldige inloggegevens');
+        } else {
+          toast.error(error.message);
+        }
+      } else {
+        toast.success('Succesvol ingelogd!');
+      }
+    } else {
+      if (!name.trim()) {
+        toast.error('Vul je naam in');
+        setLoading(false);
+        return;
+      }
+
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: { name }
+        }
+      });
+
+      if (error) {
+        if (error.message.includes('already registered')) {
+          toast.error('Dit e-mailadres is al geregistreerd');
+        } else {
+          toast.error(error.message);
+        }
+      } else {
+        toast.success('Account aangemaakt! Je bent nu ingelogd.');
+      }
+    }
+
+    setLoading(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <Card className="w-full max-w-md shadow-card">
+        <CardHeader className="text-center">
+          <div className="text-5xl mb-4">🏆</div>
+          <CardTitle className="text-2xl font-bold">SportMatch</CardTitle>
+          <p className="text-muted-foreground mt-2">
+            {isLogin ? 'Log in op je account' : 'Maak een nieuw account'}
+          </p>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {!isLogin && (
+              <div>
+                <Input
+                  type="text"
+                  placeholder="Je naam"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required={!isLogin}
+                />
+              </div>
+            )}
+            <div>
+              <Input
+                type="email"
+                placeholder="E-mailadres"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <Input
+                type="password"
+                placeholder="Wachtwoord"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full gradient-primary" disabled={loading}>
+              {loading ? 'Laden...' : isLogin ? 'Inloggen' : 'Registreren'}
+            </Button>
+          </form>
+          
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => setIsLogin(!isLogin)}
+              className="text-primary hover:underline text-sm"
+            >
+              {isLogin ? 'Nog geen account? Registreer je' : 'Al een account? Log in'}
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default Auth;
