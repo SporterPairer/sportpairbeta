@@ -92,8 +92,24 @@ export const ChatDialog = ({ open, onOpenChange, otherUser }: ChatDialogProps) =
     }
   };
 
+  const MAX_MESSAGE_LENGTH = 1000;
+
   const sendMessage = async () => {
-    if (!profile || !newMessage.trim()) return;
+    if (!profile) return;
+    
+    const trimmedMessage = newMessage.trim();
+    
+    // Validate message content
+    if (!trimmedMessage) {
+      toast.error('Bericht mag niet leeg zijn');
+      return;
+    }
+    
+    if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
+      toast.error(`Bericht mag maximaal ${MAX_MESSAGE_LENGTH} tekens bevatten`);
+      return;
+    }
+    
     setSending(true);
 
     const { error } = await supabase
@@ -101,12 +117,11 @@ export const ChatDialog = ({ open, onOpenChange, otherUser }: ChatDialogProps) =
       .insert({
         sender_id: profile.id,
         receiver_id: otherUser.id,
-        content: newMessage.trim()
+        content: trimmedMessage
       });
 
     if (error) {
       toast.error('Kon bericht niet versturen');
-      console.error('Error sending message:', error);
     } else {
       setNewMessage('');
     }
@@ -165,17 +180,25 @@ export const ChatDialog = ({ open, onOpenChange, otherUser }: ChatDialogProps) =
           </div>
         </ScrollArea>
 
-        <div className="p-4 border-t flex gap-2">
-          <Input
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Schrijf een bericht..."
-            disabled={sending}
-          />
-          <Button onClick={sendMessage} disabled={sending || !newMessage.trim()}>
-            <Send className="w-4 h-4" />
-          </Button>
+        <div className="p-4 border-t">
+          <div className="flex gap-2">
+            <Input
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value.slice(0, MAX_MESSAGE_LENGTH))}
+              onKeyPress={handleKeyPress}
+              placeholder="Schrijf een bericht..."
+              disabled={sending}
+              maxLength={MAX_MESSAGE_LENGTH}
+            />
+            <Button onClick={sendMessage} disabled={sending || !newMessage.trim()}>
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+          {newMessage.length > MAX_MESSAGE_LENGTH * 0.9 && (
+            <p className="text-xs text-muted-foreground mt-1 text-right">
+              {newMessage.length}/{MAX_MESSAGE_LENGTH}
+            </p>
+          )}
         </div>
       </DialogContent>
     </Dialog>
