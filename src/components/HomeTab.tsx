@@ -6,6 +6,7 @@ import { mockClubs } from '@/data/mockData';
 import { useAuth } from '@/hooks/useAuth';
 import { Zap, Users, Trophy, TrendingUp } from 'lucide-react';
 import sportpairLogo from '@/assets/sportpair-logo.png';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export function HomeTab() {
   const [matchDialogOpen, setMatchDialogOpen] = useState(false);
@@ -21,11 +22,14 @@ export function HomeTab() {
           <p className="text-muted-foreground text-sm font-medium">Welkom terug,</p>
           <h1 className="text-2xl font-bold">{displayName} 👋</h1>
         </div>
-        <img 
-          src={sportpairLogo} 
-          alt="SportPair" 
-          className="w-12 h-12 rounded-xl shadow-soft"
-        />
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <img 
+            src={sportpairLogo} 
+            alt="SportPair" 
+            className="w-12 h-12 rounded-xl shadow-soft"
+          />
+        </div>
       </div>
 
       {/* Quick Match Button */}
