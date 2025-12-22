@@ -8,10 +8,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Settings, LogOut, Users, MessageCircle, AlertTriangle } from 'lucide-react';
+import { Settings, LogOut, Users, MessageCircle, AlertTriangle, Shield } from 'lucide-react';
 import { UserListDialog } from './UserListDialog';
 import { ChatDialog } from './ChatDialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
+import { useNavigate } from 'react-router-dom';
 
 interface Violation {
   id: string;
@@ -31,6 +33,8 @@ interface Profile {
 
 export const ProfileTab = () => {
   const { profile, signOut } = useAuth();
+  const { isAdmin } = useIsAdmin();
+  const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
@@ -154,6 +158,11 @@ export const ProfileTab = () => {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Mijn Profiel</h1>
         <div className="flex gap-2">
+          {isAdmin && (
+            <Button variant="ghost" size="icon" onClick={() => navigate('/admin')}>
+              <Shield className="w-5 h-5 text-primary" />
+            </Button>
+          )}
           <Button variant="ghost" size="icon" onClick={() => setEditing(!editing)}>
             <Settings className="w-5 h-5" />
           </Button>
