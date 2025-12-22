@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      banned_users: {
+        Row: {
+          banned_at: string
+          id: string
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          banned_at?: string
+          id?: string
+          reason: string
+          user_id: string
+        }
+        Update: {
+          banned_at?: string
+          id?: string
+          reason?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       follows: {
         Row: {
           created_at: string
@@ -128,6 +149,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_violations: {
+        Row: {
+          created_at: string
+          id: string
+          message_content: string
+          user_id: string
+          violation_reason: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_content: string
+          user_id: string
+          violation_reason: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_content?: string
+          user_id?: string
+          violation_reason?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -140,6 +185,8 @@ export type Database = {
           min_age: number
         }[]
       }
+      get_violation_count: { Args: { _user_id: string }; Returns: number }
+      is_user_banned: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

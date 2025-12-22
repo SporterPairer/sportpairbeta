@@ -93,6 +93,7 @@ export const ChatDialog = ({ open, onOpenChange, otherUser }: ChatDialogProps) =
   };
 
   const MAX_MESSAGE_LENGTH = 1000;
+  const [isBanned, setIsBanned] = useState(false);
 
   const sendMessage = async () => {
     if (!profile) return;
@@ -109,22 +110,53 @@ export const ChatDialog = ({ open, onOpenChange, otherUser }: ChatDialogProps) =
       toast.error(`Bericht mag maximaal ${MAX_MESSAGE_LENGTH} tekens bevatten`);
       return;
     }
+
+    if (isBanned) {
+      toast.error('Je bent geblokkeerd en kunt geen berichten versturen');
+      return;
+    }
     
     setSending(true);
 
-    const { error } = await supabase
-      .from('messages')
-      .insert({
-        sender_id: profile.id,
-        receiver_id: otherUser.id,
-        content: trimmedMessage
+    try {
+      // Moderate the message first
+      const { data: moderationResult, error: moderationError } = await supabase.functions.invoke('moderate-message', {
+        body: { message: trimmedMessage, senderId: profile.user_id }
       });
 
-    if (error) {
-      toast.error('Kon bericht niet versturen');
-    } else {
-      setNewMessage('');
+      if (moderationError) {
+        console.error('Moderation error:', moderationError);
+        // Continue anyway if moderation fails
+      } else if (moderationResult && !moderationResult.approved) {
+        if (moderationResult.banned) {
+          setIsBanned(true);
+          toast.error('Je bent geblokkeerd vanwege herhaalde overtredingen van de richtlijnen.');
+        } else {
+          toast.error(`Bericht niet toegestaan: ${moderationResult.reason}. Nog ${moderationResult.warningsLeft} waarschuwing(en) over.`);
+        }
+        setSending(false);
+        return;
+      }
+
+      // Send the message
+      const { error } = await supabase
+        .from('messages')
+        .insert({
+          sender_id: profile.id,
+          receiver_id: otherUser.id,
+          content: trimmedMessage
+        });
+
+      if (error) {
+        toast.error('Kon bericht niet versturen');
+      } else {
+        setNewMessage('');
+      }
+    } catch (err) {
+      console.error('Send message error:', err);
+      toast.error('Er ging iets mis bij het versturen');
     }
+    
     setSending(false);
   };
 
