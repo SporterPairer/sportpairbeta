@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import sportpairLogo from '@/assets/sportpair-logo.png';
 
 const emailSchema = z.string().email('Ongeldig e-mailadres');
 const passwordSchema = z.string().min(6, 'Wachtwoord moet minimaal 6 tekens zijn');
@@ -109,16 +110,21 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <Card className="w-full max-w-md shadow-card">
-        <CardHeader className="text-center">
-          <div className="text-5xl mb-4">🏆</div>
-          <CardTitle className="text-2xl font-bold">SportMatch</CardTitle>
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 gradient-warm">
+      <Card className="w-full max-w-md shadow-card border-0 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
+        <CardHeader className="text-center relative">
+          <img 
+            src={sportpairLogo} 
+            alt="SportPair" 
+            className="w-20 h-20 mx-auto mb-4 rounded-2xl shadow-glow"
+          />
+          <CardTitle className="text-2xl font-bold text-gradient">SportPair</CardTitle>
           <p className="text-muted-foreground mt-2">
             {isLogin ? 'Log in op je account' : 'Maak een nieuw account'}
           </p>
         </CardHeader>
-        <CardContent>
+        <CardContent className="relative">
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <>
@@ -129,11 +135,12 @@ const Auth = () => {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required={!isLogin}
+                    className="h-12 rounded-xl border-border/50 bg-secondary/50 focus:bg-card transition-colors"
                   />
                 </div>
                 <div>
                   <Select value={birthYear} onValueChange={setBirthYear}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-12 rounded-xl border-border/50 bg-secondary/50 focus:bg-card transition-colors">
                       <SelectValue placeholder="Geboortejaar" />
                     </SelectTrigger>
                     <SelectContent className="max-h-48">
@@ -154,6 +161,7 @@ const Auth = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="h-12 rounded-xl border-border/50 bg-secondary/50 focus:bg-card transition-colors"
               />
             </div>
             <div>
@@ -163,9 +171,14 @@ const Auth = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                className="h-12 rounded-xl border-border/50 bg-secondary/50 focus:bg-card transition-colors"
               />
             </div>
-            <Button type="submit" className="w-full gradient-primary" disabled={loading}>
+            <Button 
+              type="submit" 
+              className="w-full h-12 rounded-xl gradient-primary shadow-accent font-semibold text-base" 
+              disabled={loading}
+            >
               {loading ? 'Laden...' : isLogin ? 'Inloggen' : 'Registreren'}
             </Button>
           </form>
@@ -174,7 +187,7 @@ const Auth = () => {
             <button
               type="button"
               onClick={() => setIsLogin(!isLogin)}
-              className="text-primary hover:underline text-sm"
+              className="text-primary hover:text-primary/80 font-medium text-sm transition-colors"
             >
               {isLogin ? 'Nog geen account? Registreer je' : 'Al een account? Log in'}
             </button>
