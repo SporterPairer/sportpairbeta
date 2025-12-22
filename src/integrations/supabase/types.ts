@@ -113,6 +113,47 @@ export type Database = {
           },
         ]
       }
+      moderation_logs: {
+        Row: {
+          ai_reasoning: string | null
+          created_at: string
+          id: string
+          is_approved: boolean
+          message_content: string
+          message_id: string | null
+          sender_id: string
+          violation_type: string | null
+        }
+        Insert: {
+          ai_reasoning?: string | null
+          created_at?: string
+          id?: string
+          is_approved: boolean
+          message_content: string
+          message_id?: string | null
+          sender_id: string
+          violation_type?: string | null
+        }
+        Update: {
+          ai_reasoning?: string | null
+          created_at?: string
+          id?: string
+          is_approved?: boolean
+          message_content?: string
+          message_id?: string | null
+          sender_id?: string
+          violation_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moderation_logs_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           age: number | null

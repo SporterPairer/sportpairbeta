@@ -14,7 +14,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, senderId } = await req.json();
+    const { message, senderId, messageId } = await req.json();
     
     if (!message || !senderId) {
       return new Response(
@@ -40,6 +40,16 @@ serve(async (req) => {
       .maybeSingle();
 
     if (bannedUser) {
+      // Log the attempt from banned user
+      await supabase.from('moderation_logs').insert({
+        message_id: messageId || null,
+        sender_id: senderId,
+        message_content: message.substring(0, 500),
+        is_approved: false,
+        ai_reasoning: 'User is already banned - message blocked automatically',
+        violation_type: 'BANNED_USER'
+      });
+
       return new Response(
         JSON.stringify({ 
           approved: false, 
@@ -76,7 +86,9 @@ Guidelines that messages must follow:
 Respond with a JSON object ONLY (no markdown):
 {
   "approved": boolean,
-  "reason": "string explaining why it was rejected (only if approved is false)"
+  "reason": "detailed explanation of your decision - explain WHY the message was approved or rejected",
+  "violation_type": "one of: HATE_SPEECH, SEXUAL_CONTENT, THREATS, SPAM, PERSONAL_INFO, BULLYING, OFF_TOPIC, or null if approved",
+  "confidence": "HIGH, MEDIUM, or LOW - how confident you are in this decision"
 }`
           },
           {
@@ -90,7 +102,15 @@ Respond with a JSON object ONLY (no markdown):
     if (!response.ok) {
       if (response.status === 429) {
         console.error('Rate limit exceeded');
-        // Allow message through if rate limited (fail-open for UX)
+        // Log rate limit case
+        await supabase.from('moderation_logs').insert({
+          message_id: messageId || null,
+          sender_id: senderId,
+          message_content: message.substring(0, 500),
+          is_approved: true,
+          ai_reasoning: 'Rate limit exceeded - message allowed (fail-open)',
+          violation_type: null
+        });
         return new Response(
           JSON.stringify({ approved: true }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -111,9 +131,27 @@ Respond with a JSON object ONLY (no markdown):
       moderationResult = JSON.parse(cleanedResponse);
     } catch (e) {
       console.error('Failed to parse AI response:', aiResponse);
-      // Default to approved if parsing fails
+      // Log parsing failure
+      await supabase.from('moderation_logs').insert({
+        message_id: messageId || null,
+        sender_id: senderId,
+        message_content: message.substring(0, 500),
+        is_approved: true,
+        ai_reasoning: `AI response parsing failed - message allowed. Raw response: ${aiResponse?.substring(0, 200)}`,
+        violation_type: null
+      });
       moderationResult = { approved: true };
     }
+
+    // Log the moderation decision
+    await supabase.from('moderation_logs').insert({
+      message_id: messageId || null,
+      sender_id: senderId,
+      message_content: message.substring(0, 500),
+      is_approved: moderationResult.approved,
+      ai_reasoning: moderationResult.reason || (moderationResult.approved ? 'Message meets community guidelines' : 'Guideline violation'),
+      violation_type: moderationResult.violation_type || null
+    });
 
     // If message is not approved, record the violation
     if (!moderationResult.approved) {
@@ -122,7 +160,7 @@ Respond with a JSON object ONLY (no markdown):
         .from('user_violations')
         .insert({
           user_id: senderId,
-          message_content: message.substring(0, 500), // Limit stored content
+          message_content: message.substring(0, 500),
           violation_reason: moderationResult.reason || 'Guideline violation'
         });
 
@@ -140,8 +178,18 @@ Respond with a JSON object ONLY (no markdown):
           .from('banned_users')
           .insert({
             user_id: senderId,
-            reason: `Banned after ${violationCount} guideline violations`
+            reason: `Automatically banned after ${violationCount} guideline violations. Last violation: ${moderationResult.violation_type || 'Unknown'}`
           });
+
+        // Log the ban
+        await supabase.from('moderation_logs').insert({
+          message_id: null,
+          sender_id: senderId,
+          message_content: `[SYSTEM] User banned after ${violationCount} violations`,
+          is_approved: false,
+          ai_reasoning: `User automatically banned after reaching ${VIOLATION_THRESHOLD} violations. Violation types: ${moderationResult.violation_type}`,
+          violation_type: 'AUTO_BAN'
+        });
 
         return new Response(
           JSON.stringify({ 
