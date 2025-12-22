@@ -8,9 +8,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Settings, LogOut, Users, MessageCircle } from 'lucide-react';
+import { Settings, LogOut, Users, MessageCircle, AlertTriangle } from 'lucide-react';
 import { UserListDialog } from './UserListDialog';
 import { ChatDialog } from './ChatDialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+
+interface Violation {
+  id: string;
+  violation_reason: string;
+  created_at: string;
+}
 
 interface Profile {
   id: string;
@@ -34,6 +41,8 @@ export const ProfileTab = () => {
   const [showFollowers, setShowFollowers] = useState(false);
   const [showFollowing, setShowFollowing] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [violations, setViolations] = useState<Violation[]>([]);
+  const [showViolations, setShowViolations] = useState(false);
   const [selectedChatUser, setSelectedChatUser] = useState<Profile | null>(null);
 
   useEffect(() => {
@@ -42,6 +51,7 @@ export const ProfileTab = () => {
       setBio(profile.bio || '');
       setAge(profile.age);
       fetchFollowData();
+      fetchViolations();
     }
   }, [profile]);
 
@@ -93,6 +103,20 @@ export const ProfileTab = () => {
           setMutualFollowers(mutuals);
         }
       }
+    }
+  };
+
+  const fetchViolations = async () => {
+    if (!profile) return;
+
+    const { data } = await supabase
+      .from('user_violations')
+      .select('id, violation_reason, created_at')
+      .eq('user_id', profile.user_id)
+      .order('created_at', { ascending: false });
+
+    if (data) {
+      setViolations(data);
     }
   };
 
@@ -228,6 +252,48 @@ export const ProfileTab = () => {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Violation History */}
+      {violations.length > 0 && (
+        <Collapsible open={showViolations} onOpenChange={setShowViolations}>
+          <Card className="shadow-card border-destructive/20">
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-destructive" />
+                  Waarschuwingen ({violations.length}/3)
+                  <Badge variant="destructive" className="ml-auto">
+                    {3 - violations.length} over
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="pt-0">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Na 3 waarschuwingen wordt je account geblokkeerd.
+                </p>
+                <div className="space-y-3">
+                  {violations.map((violation) => (
+                    <div key={violation.id} className="p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+                      <p className="text-sm font-medium text-destructive">{violation.violation_reason}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(violation.created_at).toLocaleDateString('nl-NL', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
       )}
 
       <UserListDialog
