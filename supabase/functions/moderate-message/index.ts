@@ -8,21 +8,41 @@ const corsHeaders = {
 
 const VIOLATION_THRESHOLD = 3; // Ban after 3 violations
 
+// List of obviously inappropriate name patterns
+const BANNED_NAME_PATTERNS = [
+  /n[i1!|]gg[e3a@]/i,
+  /f[a@4]gg?[o0]/i,
+  /k[i1]ke/i,
+  /ch[i1]nk/i,
+  /sp[i1]c/i,
+  /wh[o0]re/i,
+  /slut/i,
+  /c[u0]nt/i,
+  /p[e3]do/i,
+  /r[a@4]p[e3i1]st/i,
+  /n[a@4]z[i1]/i,
+  /h[i1]tl[e3]r/i,
+  /sex/i,
+  /porn/i,
+  /d[i1]ck/i,
+  /p[e3]n[i1]s/i,
+  /pussy/i,
+  /asshole/i,
+];
+
+function hasInappropriateName(name: string): boolean {
+  const lowerName = name.toLowerCase();
+  return BANNED_NAME_PATTERNS.some(pattern => pattern.test(lowerName));
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { message, senderId, messageId } = await req.json();
+    const { message, senderId, messageId, moderateName, userName } = await req.json();
     
-    if (!message || !senderId) {
-      return new Response(
-        JSON.stringify({ error: 'Missing message or senderId' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
@@ -31,6 +51,105 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Name moderation mode
+    if (moderateName && userName) {
+      console.log('Moderating name:', userName);
+      
+      // Quick check with regex patterns first
+      if (hasInappropriateName(userName)) {
+        console.log('Name rejected by pattern match:', userName);
+        return new Response(
+          JSON.stringify({ 
+            approved: false, 
+            reason: 'This username contains inappropriate content and is not allowed.',
+            shouldBan: true
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // AI check for more subtle inappropriate names
+      const nameResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            {
+              role: 'system',
+              content: `You are a username moderation AI. Check if a username is inappropriate.
+
+REJECT usernames that contain:
+- Racial slurs or hate speech (including variations, misspellings, or letter substitutions)
+- Sexual content or references
+- Violence, threats, or harmful content
+- Pedophilia references
+- Nazi/Hitler references
+- Profanity or vulgar language
+- Impersonation of harmful figures
+
+Be strict but fair. Normal names, nicknames, and gaming handles are OK.
+
+Respond with JSON ONLY (no markdown):
+{
+  "approved": boolean,
+  "reason": "brief explanation"
+}`
+            },
+            {
+              role: 'user',
+              content: `Check this username: "${userName}"`
+            }
+          ],
+        }),
+      });
+
+      if (!nameResponse.ok) {
+        console.error('Name moderation API error:', nameResponse.status);
+        // Allow on API failure but log it
+        return new Response(
+          JSON.stringify({ approved: true }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const nameData = await nameResponse.json();
+      const nameResult = nameData.choices?.[0]?.message?.content;
+      
+      try {
+        const cleanedNameResult = nameResult.replace(/```json\n?|\n?```/g, '').trim();
+        const parsedNameResult = JSON.parse(cleanedNameResult);
+        
+        console.log('Name moderation result:', parsedNameResult);
+        
+        return new Response(
+          JSON.stringify({ 
+            approved: parsedNameResult.approved, 
+            reason: parsedNameResult.reason,
+            shouldBan: !parsedNameResult.approved
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (e) {
+        console.error('Failed to parse name moderation response:', nameResult);
+        return new Response(
+          JSON.stringify({ approved: true }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Regular message moderation
+    if (!message || !senderId) {
+      return new Response(
+        JSON.stringify({ error: 'Missing message or senderId' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Check if user is already banned
     const { data: bannedUser } = await supabase
