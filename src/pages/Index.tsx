@@ -58,6 +58,7 @@ const Index = () => {
       <main className="container max-w-lg mx-auto px-4 pt-4 pb-28">
         {activeTab === 'home' && <HomeTab />}
         {activeTab === 'discover' && <DiscoverTab />}
+        {activeTab === 'clubs' && <ClubsTab />}
         {activeTab === 'messages' && <MessagesTab />}
         {activeTab === 'leaderboard' && <LeaderboardTab />}
         {activeTab === 'profile' && <ProfileTab />}

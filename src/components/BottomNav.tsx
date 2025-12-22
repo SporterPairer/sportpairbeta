@@ -9,6 +9,7 @@ interface BottomNavProps {
 const navItems = [
   { id: 'home', label: 'Home', icon: Home },
   { id: 'discover', label: 'Ontdek', icon: Compass },
+  { id: 'clubs', label: 'Clubs', icon: Users },
   { id: 'messages', label: 'Berichten', icon: MessageCircle },
   { id: 'leaderboard', label: 'Rang', icon: Trophy },
   { id: 'profile', label: 'Profiel', icon: User },
