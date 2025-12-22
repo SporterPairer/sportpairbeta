@@ -8,6 +8,8 @@ import { LeaderboardTab } from '@/components/LeaderboardTab';
 import { FeedTab } from '@/components/FeedTab';
 import { ProfileTab } from '@/components/ProfileTab';
 import { DiscoverTab } from '@/components/DiscoverTab';
+import { MessagesTab } from '@/components/MessagesTab';
+import { NotificationsButton } from '@/components/NotificationsButton';
 import sportpairLogo from '@/assets/sportpair-logo.png';
 
 const Index = () => {
@@ -42,10 +44,21 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="container max-w-lg mx-auto px-4 pt-6 pb-28">
+      {/* Header with notifications */}
+      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-border/50">
+        <div className="container max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img src={sportpairLogo} alt="SportPair" className="w-8 h-8 rounded-lg" />
+            <span className="font-bold text-lg">SportPair</span>
+          </div>
+          <NotificationsButton onNavigateToMessages={() => setActiveTab('messages')} />
+        </div>
+      </header>
+
+      <main className="container max-w-lg mx-auto px-4 pt-4 pb-28">
         {activeTab === 'home' && <HomeTab />}
         {activeTab === 'discover' && <DiscoverTab />}
-        {activeTab === 'clubs' && <ClubsTab />}
+        {activeTab === 'messages' && <MessagesTab />}
         {activeTab === 'leaderboard' && <LeaderboardTab />}
         {activeTab === 'profile' && <ProfileTab />}
       </main>
