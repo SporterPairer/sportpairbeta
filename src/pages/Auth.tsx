@@ -86,6 +86,25 @@ const Auth = () => {
         return;
       }
 
+      // Moderate the name before signup
+      try {
+        const moderationResponse = await supabase.functions.invoke('moderate-message', {
+          body: { moderateName: true, userName: name.trim() }
+        });
+
+        if (moderationResponse.error) {
+          console.error('Name moderation error:', moderationResponse.error);
+          // Continue with signup if moderation fails
+        } else if (moderationResponse.data && !moderationResponse.data.approved) {
+          toast.error(moderationResponse.data.reason || 'Deze naam is niet toegestaan. Kies een andere naam.');
+          setLoading(false);
+          return;
+        }
+      } catch (moderationError) {
+        console.error('Name moderation error:', moderationError);
+        // Continue with signup if moderation fails
+      }
+
       const { error } = await supabase.auth.signUp({
         email,
         password,
