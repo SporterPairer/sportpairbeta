@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Bell, MessageCircle, Trophy, Users, UserPlus } from 'lucide-react';
+import { Bell, MessageCircle, Trophy, Users, UserPlus, Dumbbell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -11,16 +11,18 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { SPORTS, LEVELS } from '@/types';
 
 interface Notification {
   id: string;
-  type: 'message' | 'follow' | 'ranking' | 'invitation';
+  type: 'message' | 'follow' | 'ranking' | 'invitation' | 'match_request';
   title: string;
   description: string;
   time: string;
   read: boolean;
   avatar?: string;
   userName?: string;
+  matchRequestId?: string;
 }
 
 interface NotificationsButtonProps {
@@ -59,6 +61,17 @@ export function NotificationsButton({ onNavigateToMessages }: NotificationsButto
             schema: 'public',
             table: 'follows',
             filter: `following_id=eq.${profile.id}`
+          },
+          () => {
+            fetchNotifications();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'match_requests'
           },
           () => {
             fetchNotifications();
@@ -144,10 +157,48 @@ export function NotificationsButton({ onNavigateToMessages }: NotificationsButto
       });
     }
 
+    // Fetch active match requests from OTHER users (not the current user)
+    const { data: matchRequests } = await supabase
+      .from('match_requests')
+      .select('*')
+      .eq('status', 'searching')
+      .neq('user_id', profile.id)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (matchRequests && matchRequests.length > 0) {
+      const userIds = [...new Set(matchRequests.map((r) => r.user_id))];
+      const { data: requestProfiles } = await supabase
+        .from('profiles')
+        .select('id, name, avatar')
+        .in('id', userIds);
+
+      const profileMap = new Map(requestProfiles?.map((p) => [p.id, p]) || []);
+
+      matchRequests.forEach((request) => {
+        const requester = profileMap.get(request.user_id);
+        const sport = SPORTS.find(s => s.value === request.sport);
+        const level = LEVELS.find(l => l.value === request.level);
+        const isRecent = new Date(request.created_at).getTime() > Date.now() - 1 * 60 * 60 * 1000; // 1 hour
+        
+        notificationsList.push({
+          id: `match-${request.id}`,
+          type: 'match_request',
+          title: `${requester?.name || 'Iemand'} wil sporten!`,
+          description: `${sport?.emoji || '🏃'} ${sport?.label || request.sport} • ${level?.label || request.level}`,
+          time: request.created_at,
+          read: !isRecent,
+          avatar: requester?.avatar || undefined,
+          userName: requester?.name,
+          matchRequestId: request.id,
+        });
+      });
+    }
+
     // Sort by time
     notificationsList.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 
-    setNotifications(notificationsList.slice(0, 15));
+    setNotifications(notificationsList.slice(0, 20));
     setUnreadCount(notificationsList.filter((n) => !n.read).length);
   };
 
@@ -172,6 +223,8 @@ export function NotificationsButton({ onNavigateToMessages }: NotificationsButto
         return <Trophy className="h-4 w-4 text-yellow-500" />;
       case 'invitation':
         return <Users className="h-4 w-4 text-blue-500" />;
+      case 'match_request':
+        return <Dumbbell className="h-4 w-4 text-primary" />;
     }
   };
 
@@ -180,6 +233,7 @@ export function NotificationsButton({ onNavigateToMessages }: NotificationsButto
       setOpen(false);
       onNavigateToMessages();
     }
+    // Match requests could navigate to a match detail or messages in the future
   };
 
   return (
