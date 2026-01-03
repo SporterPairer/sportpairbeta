@@ -1,45 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { mockClubs, mockUsers } from '@/data/mockData';
-import { SPORTS, LEVELS, AGE_GROUPS, Sport, Level, AgeGroup, Club, User } from '@/types';
+import { mockClubs } from '@/data/mockData';
+import { SPORTS, LEVELS, AGE_GROUPS, Sport, Level, AgeGroup, Club } from '@/types';
 import { cn } from '@/lib/utils';
-import { Check, ChevronRight, Sparkles, X } from 'lucide-react';
+import { Check, ChevronRight, Loader2, Search, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-
-// Helper function to convert age to age group (privacy-preserving)
-const getAgeGroup = (age: number | null | undefined): string => {
-  if (age === null || age === undefined) return 'Onbekend';
-  if (age < 18) return 'Onder 18';
-  if (age <= 24) return '18-24';
-  if (age <= 34) return '25-34';
-  if (age <= 44) return '35-44';
-  if (age <= 54) return '45-54';
-  return '55+';
-};
-
-// Check if a match is age-appropriate (minors can only match with users within 4 years)
-const isAgeAppropriateMatch = (userAge: number | null | undefined, matchAge: number | null | undefined): boolean => {
-  // If either age is unknown, allow the match (benefit of the doubt)
-  if (!userAge || !matchAge) return true;
-  
-  // If user is a minor (under 18), restrict matches to within 4 years
-  if (userAge < 18) {
-    return matchAge >= userAge - 4 && matchAge <= userAge + 4;
-  }
-  
-  // Adults can match with anyone 16+
-  return matchAge >= 16;
-};
+import { supabase } from '@/integrations/supabase/client';
 
 interface MatchDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-type Step = 'sport' | 'level' | 'age' | 'club' | 'result';
+type Step = 'sport' | 'level' | 'age' | 'club' | 'searching';
 
 export function MatchDialog({ open, onOpenChange }: MatchDialogProps) {
   const [step, setStep] = useState<Step>('sport');
@@ -47,7 +23,7 @@ export function MatchDialog({ open, onOpenChange }: MatchDialogProps) {
   const [selectedLevel, setSelectedLevel] = useState<Level | null>(null);
   const [selectedAge, setSelectedAge] = useState<AgeGroup | null>(null);
   const [selectedClub, setSelectedClub] = useState<Club | null>(null);
-  const [matchedUser, setMatchedUser] = useState<User | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { profile } = useAuth();
 
@@ -57,7 +33,7 @@ export function MatchDialog({ open, onOpenChange }: MatchDialogProps) {
     setSelectedLevel(null);
     setSelectedAge(null);
     setSelectedClub(null);
-    setMatchedUser(null);
+    setIsSubmitting(false);
   };
 
   const handleClose = () => {
@@ -65,38 +41,93 @@ export function MatchDialog({ open, onOpenChange }: MatchDialogProps) {
     setTimeout(reset, 300);
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 'sport' && selectedSport) setStep('level');
     else if (step === 'level' && selectedLevel) setStep('age');
     else if (step === 'age' && selectedAge) setStep('club');
     else if (step === 'club' && selectedClub) {
-      // Find a random match that is age-appropriate
-      const userAge = profile?.age;
-      const availableMembers = selectedClub.members.filter(m => 
-        m.id !== '1' && isAgeAppropriateMatch(userAge, m.age)
-      );
-      
-      if (availableMembers.length === 0) {
-        toast({
-          title: "Geen geschikte matches gevonden",
-          description: "Er zijn momenteel geen leden beschikbaar die bij je leeftijdscategorie passen.",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      const randomMatch = availableMembers[Math.floor(Math.random() * availableMembers.length)];
-      setMatchedUser(randomMatch);
-      setStep('result');
+      await createMatchRequest();
     }
   };
 
-  const handleAcceptMatch = () => {
-    toast({
-      title: "Match geaccepteerd! 🎉",
-      description: `Je gaat ${SPORTS.find(s => s.value === selectedSport)?.label.toLowerCase()} met ${matchedUser?.name}!`,
-    });
-    handleClose();
+  const createMatchRequest = async () => {
+    if (!profile || !selectedSport || !selectedLevel || !selectedAge) {
+      toast({
+        title: "Fout",
+        description: "Je moet ingelogd zijn om te matchen",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Check if user already has an active match request
+      const { data: existingRequest } = await supabase
+        .from('match_requests')
+        .select('id')
+        .eq('user_id', profile.id)
+        .eq('status', 'searching')
+        .maybeSingle();
+
+      if (existingRequest) {
+        // Cancel the existing request first
+        await supabase
+          .from('match_requests')
+          .update({ status: 'cancelled' })
+          .eq('id', existingRequest.id);
+      }
+
+      // Create new match request
+      const { error } = await supabase
+        .from('match_requests')
+        .insert({
+          user_id: profile.id,
+          sport: selectedSport,
+          level: selectedLevel,
+          age_group: selectedAge,
+          club_name: selectedClub?.name || null,
+          status: 'searching'
+        });
+
+      if (error) throw error;
+
+      setStep('searching');
+      toast({
+        title: "Zoekverzoek aangemaakt! 🔍",
+        description: "Andere sporters krijgen nu een melding dat je wilt sporten.",
+      });
+    } catch (error) {
+      console.error('Error creating match request:', error);
+      toast({
+        title: "Fout",
+        description: "Kon zoekverzoek niet aanmaken",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelSearch = async () => {
+    if (!profile) return;
+
+    try {
+      await supabase
+        .from('match_requests')
+        .update({ status: 'cancelled' })
+        .eq('user_id', profile.id)
+        .eq('status', 'searching');
+
+      toast({
+        title: "Zoekactie gestopt",
+        description: "Je zoekverzoek is geannuleerd.",
+      });
+      handleClose();
+    } catch (error) {
+      console.error('Error cancelling match request:', error);
+    }
   };
 
   const canProceed = () => {
@@ -116,7 +147,7 @@ export function MatchDialog({ open, onOpenChange }: MatchDialogProps) {
             {step === 'level' && 'Kies je niveau'}
             {step === 'age' && 'Leeftijdsgroep'}
             {step === 'club' && 'Kies een club'}
-            {step === 'result' && 'Match gevonden!'}
+            {step === 'searching' && 'Zoeken naar match...'}
           </DialogTitle>
         </DialogHeader>
 
@@ -220,24 +251,21 @@ export function MatchDialog({ open, onOpenChange }: MatchDialogProps) {
             </div>
           )}
 
-          {/* Match Result */}
-          {step === 'result' && matchedUser && (
-            <div className="flex flex-col items-center gap-6 py-4">
+          {/* Searching State */}
+          {step === 'searching' && (
+            <div className="flex flex-col items-center gap-6 py-8">
               <div className="relative">
                 <div className="absolute -inset-4 rounded-full gradient-primary opacity-20 blur-xl animate-pulse" />
-                <img
-                  src={matchedUser.avatar}
-                  alt={matchedUser.name}
-                  className="relative h-28 w-28 rounded-full border-4 border-primary shadow-glow"
-                />
-                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex h-8 w-8 items-center justify-center rounded-full gradient-accent">
-                  <Sparkles className="h-4 w-4 text-accent-foreground" />
+                <div className="relative h-24 w-24 rounded-full gradient-primary flex items-center justify-center">
+                  <Search className="h-10 w-10 text-primary-foreground animate-pulse" />
                 </div>
               </div>
               <div className="text-center">
-                <h3 className="text-xl font-bold">{matchedUser.name}</h3>
-                <p className="text-muted-foreground">
-                  {LEVELS.find(l => l.value === matchedUser.level)?.label} • {getAgeGroup(matchedUser.age)}
+                <h3 className="text-xl font-bold mb-2">Zoeken naar sporters...</h3>
+                <p className="text-muted-foreground max-w-xs">
+                  Andere sporters krijgen een melding dat je wilt{' '}
+                  {SPORTS.find(s => s.value === selectedSport)?.label.toLowerCase()}.
+                  Ze kunnen je uitnodigen!
                 </p>
               </div>
               <div className="flex items-center gap-2 rounded-full bg-secondary px-4 py-2">
@@ -247,31 +275,38 @@ export function MatchDialog({ open, onOpenChange }: MatchDialogProps) {
                 <span className="font-medium">
                   {SPORTS.find(s => s.value === selectedSport)?.label}
                 </span>
+                <span className="text-muted-foreground">•</span>
+                <span className="text-sm text-muted-foreground">
+                  {LEVELS.find(l => l.value === selectedLevel)?.label}
+                </span>
               </div>
-              <div className="flex w-full gap-3">
-                <Button variant="outline" className="flex-1" onClick={handleClose}>
-                  <X className="mr-2 h-4 w-4" />
-                  Afwijzen
-                </Button>
-                <Button variant="gradient" className="flex-1" onClick={handleAcceptMatch}>
-                  <Check className="mr-2 h-4 w-4" />
-                  Accepteren
-                </Button>
-              </div>
+              <Button variant="outline" onClick={handleCancelSearch} className="mt-4">
+                <X className="mr-2 h-4 w-4" />
+                Zoeken stoppen
+              </Button>
             </div>
           )}
         </div>
 
-        {step !== 'result' && (
+        {step !== 'searching' && (
           <div className="border-t border-border p-4">
             <Button 
               variant="gradient" 
               className="w-full" 
-              disabled={!canProceed()}
+              disabled={!canProceed() || isSubmitting}
               onClick={handleNext}
             >
-              Volgende
-              <ChevronRight className="ml-2 h-4 w-4" />
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Bezig...
+                </>
+              ) : (
+                <>
+                  {step === 'club' ? 'Start zoeken' : 'Volgende'}
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </>
+              )}
             </Button>
           </div>
         )}

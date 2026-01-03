@@ -71,6 +71,63 @@ export type Database = {
           },
         ]
       }
+      match_requests: {
+        Row: {
+          age_group: string
+          club_name: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          level: string
+          matched_at: string | null
+          matched_with_id: string | null
+          sport: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          age_group: string
+          club_name?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          level: string
+          matched_at?: string | null
+          matched_with_id?: string | null
+          sport: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          age_group?: string
+          club_name?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          level?: string
+          matched_at?: string | null
+          matched_with_id?: string | null
+          sport?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_requests_matched_with_id_fkey"
+            columns: ["matched_with_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string
