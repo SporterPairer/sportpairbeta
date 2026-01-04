@@ -17,8 +17,8 @@ const navItems = [
 
 export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 glass-strong safe-area-pb">
-      <div className="mx-auto flex max-w-lg items-center justify-around px-2 py-2">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-t border-border">
+      <div className="mx-auto flex max-w-lg items-center justify-around px-1 py-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -28,24 +28,24 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
               key={item.id}
               onClick={() => onTabChange(item.id)}
               className={cn(
-                "flex flex-1 flex-col items-center gap-1 rounded-2xl py-2 transition-all duration-300",
+                "flex flex-1 flex-col items-center gap-1 py-1.5 transition-colors",
                 isActive 
                   ? "text-primary" 
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
               <div className={cn(
-                "flex h-10 w-10 items-center justify-center rounded-2xl transition-all duration-300",
-                isActive && "gradient-primary shadow-glow scale-105"
+                "flex h-9 w-9 items-center justify-center rounded-xl transition-all",
+                isActive && "bg-primary/10"
               )}>
                 <Icon className={cn(
-                  "h-5 w-5 transition-all duration-300",
-                  isActive ? "text-primary-foreground" : ""
+                  "h-5 w-5",
+                  isActive && "text-primary"
                 )} />
               </div>
               <span className={cn(
-                "text-[10px] font-semibold transition-all duration-300",
-                isActive && "text-gradient"
+                "text-[10px] font-medium",
+                isActive && "text-primary"
               )}>{item.label}</span>
             </button>
           );

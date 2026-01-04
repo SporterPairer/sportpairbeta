@@ -220,6 +220,7 @@ export type Database = {
           id: string
           level: string | null
           name: string
+          sport_hours: number | null
           updated_at: string
           user_id: string
         }
@@ -231,6 +232,7 @@ export type Database = {
           id?: string
           level?: string | null
           name: string
+          sport_hours?: number | null
           updated_at?: string
           user_id: string
         }
@@ -242,10 +244,46 @@ export type Database = {
           id?: string
           level?: string | null
           name?: string
+          sport_hours?: number | null
           updated_at?: string
           user_id?: string
         }
         Relationships: []
+      }
+      sport_goals: {
+        Row: {
+          completed: boolean | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          sport: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          sport: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          sport?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sport_goals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
