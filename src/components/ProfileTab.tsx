@@ -8,12 +8,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Settings, LogOut, Users, MessageCircle, AlertTriangle, Shield } from 'lucide-react';
+import { Settings, LogOut, Users, MessageCircle, AlertTriangle, Shield, Edit3, X, Check } from 'lucide-react';
 import { UserListDialog } from './UserListDialog';
 import { ChatDialog } from './ChatDialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { useNavigate } from 'react-router-dom';
+import { SportHoursCard } from './SportHoursCard';
+import { SportGoalsCard } from './SportGoalsCard';
 
 interface Violation {
   id: string;
@@ -29,6 +31,7 @@ interface Profile {
   level: string;
   age: number | null;
   bio: string | null;
+  sport_hours?: number;
 }
 
 export const ProfileTab = () => {
@@ -39,6 +42,7 @@ export const ProfileTab = () => {
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const [age, setAge] = useState<number | null>(null);
+  const [sportHours, setSportHours] = useState(0);
   const [followers, setFollowers] = useState<Profile[]>([]);
   const [following, setFollowing] = useState<Profile[]>([]);
   const [mutualFollowers, setMutualFollowers] = useState<Profile[]>([]);
@@ -54,6 +58,7 @@ export const ProfileTab = () => {
       setName(profile.name);
       setBio(profile.bio || '');
       setAge(profile.age);
+      setSportHours((profile as any).sport_hours || 0);
       fetchFollowData();
       fetchViolations();
     }
@@ -62,7 +67,6 @@ export const ProfileTab = () => {
   const fetchFollowData = async () => {
     if (!profile) return;
 
-    // Fetch followers
     const { data: followersData } = await supabase
       .from('follows')
       .select('follower_id')
@@ -79,7 +83,6 @@ export const ProfileTab = () => {
       }
     }
 
-    // Fetch following
     const { data: followingData } = await supabase
       .from('follows')
       .select('following_id')
@@ -94,7 +97,6 @@ export const ProfileTab = () => {
           .in('id', followingIds);
         setFollowing(followingProfiles || []);
 
-        // Calculate mutual followers
         const { data: mutualData } = await supabase
           .from('follows')
           .select('follower_id')
@@ -148,66 +150,61 @@ export const ProfileTab = () => {
   if (!profile) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Laden...</p>
+        <div className="animate-pulse flex flex-col items-center gap-4">
+          <div className="w-20 h-20 rounded-full bg-muted" />
+          <div className="h-4 w-32 bg-muted rounded" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="pb-24 space-y-4">
-      <div className="flex items-center justify-between mb-6">
+    <div className="pb-24 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Mijn Profiel</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           {isAdmin && (
-            <Button variant="ghost" size="icon" onClick={() => navigate('/admin')}>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/admin')} className="rounded-xl">
               <Shield className="w-5 h-5 text-primary" />
             </Button>
           )}
-          <Button variant="ghost" size="icon" onClick={() => setEditing(!editing)}>
-            <Settings className="w-5 h-5" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={signOut}>
+          <Button variant="ghost" size="icon" onClick={signOut} className="rounded-xl">
             <LogOut className="w-5 h-5" />
           </Button>
         </div>
       </div>
 
-      <Card className="shadow-card">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <Avatar className="w-20 h-20 ring-4 ring-primary/20">
+      {/* Profile Card */}
+      <Card className="shadow-card overflow-hidden">
+        <div className="h-20 gradient-primary relative">
+          <div className="absolute -bottom-10 left-6">
+            <Avatar className="w-20 h-20 ring-4 ring-background shadow-lg">
               <AvatarImage src={profile.avatar || undefined} />
-              <AvatarFallback className="text-xl">{profile.name.charAt(0)}</AvatarFallback>
+              <AvatarFallback className="text-xl font-bold bg-secondary">
+                {profile.name.charAt(0)}
+              </AvatarFallback>
             </Avatar>
-            <div className="flex-1">
-              {editing ? (
-                <Input value={name} onChange={(e) => setName(e.target.value)} className="mb-2" />
-              ) : (
-                <h2 className="text-xl font-bold">{profile.name}</h2>
-              )}
-              <Badge variant="secondary" className="capitalize">{profile.level}</Badge>
-            </div>
           </div>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setEditing(!editing)}
+            className="absolute top-3 right-3 text-white/80 hover:text-white hover:bg-white/20 rounded-xl"
+          >
+            {editing ? <X className="w-5 h-5" /> : <Edit3 className="w-5 h-5" />}
+          </Button>
+        </div>
 
-          <div className="flex justify-around mt-6 py-4 border-t border-b border-border">
-            <button onClick={() => setShowFollowers(true)} className="text-center">
-              <p className="text-2xl font-bold">{followers.length}</p>
-              <p className="text-sm text-muted-foreground">Volgers</p>
-            </button>
-            <button onClick={() => setShowFollowing(true)} className="text-center">
-              <p className="text-2xl font-bold">{following.length}</p>
-              <p className="text-sm text-muted-foreground">Volgend</p>
-            </button>
-            <div className="text-center">
-              <p className="text-2xl font-bold">{mutualFollowers.length}</p>
-              <p className="text-sm text-muted-foreground">Vrienden</p>
-            </div>
-          </div>
-
+        <CardContent className="pt-14 pb-6">
           {editing ? (
-            <div className="mt-4 space-y-4">
+            <div className="space-y-4">
               <div>
-                <label className="text-sm text-muted-foreground">Leeftijd</label>
+                <label className="text-sm font-medium text-muted-foreground">Naam</label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Leeftijd</label>
                 <Input
                   type="number"
                   value={age || ''}
@@ -215,55 +212,103 @@ export const ProfileTab = () => {
                 />
               </div>
               <div>
-                <label className="text-sm text-muted-foreground">Bio</label>
+                <label className="text-sm font-medium text-muted-foreground">Bio</label>
                 <Textarea
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   placeholder="Vertel iets over jezelf..."
+                  rows={3}
                 />
               </div>
-              <Button onClick={handleSave} className="w-full gradient-primary">
+              <Button onClick={handleSave} className="w-full gradient-primary text-white">
+                <Check className="w-4 h-4 mr-2" />
                 Opslaan
               </Button>
             </div>
           ) : (
-            profile.bio && <p className="mt-4 text-muted-foreground">{profile.bio}</p>
+            <>
+              <div className="mb-4">
+                <h2 className="text-xl font-bold">{profile.name}</h2>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge className="capitalize bg-primary/10 text-primary hover:bg-primary/20">
+                    {profile.level}
+                  </Badge>
+                  {profile.age && (
+                    <span className="text-sm text-muted-foreground">{profile.age} jaar</span>
+                  )}
+                </div>
+              </div>
+              {profile.bio && (
+                <p className="text-muted-foreground text-sm leading-relaxed">{profile.bio}</p>
+              )}
+            </>
           )}
+
+          {/* Stats */}
+          <div className="flex justify-around mt-6 py-4 border-t border-border">
+            <button onClick={() => setShowFollowers(true)} className="text-center group">
+              <p className="text-2xl font-bold group-hover:text-primary transition-colors">{followers.length}</p>
+              <p className="text-xs text-muted-foreground">Volgers</p>
+            </button>
+            <button onClick={() => setShowFollowing(true)} className="text-center group">
+              <p className="text-2xl font-bold group-hover:text-primary transition-colors">{following.length}</p>
+              <p className="text-xs text-muted-foreground">Volgend</p>
+            </button>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-primary">{mutualFollowers.length}</p>
+              <p className="text-xs text-muted-foreground">Vrienden</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Mutual followers (friends) - can chat */}
+      {/* Sport Hours */}
+      <SportHoursCard 
+        profileId={profile.id} 
+        currentHours={sportHours} 
+        onUpdate={setSportHours} 
+      />
+
+      {/* Sport Goals */}
+      <SportGoalsCard profileId={profile.id} />
+
+      {/* Friends (Chat) */}
       {mutualFollowers.length > 0 && (
         <Card className="shadow-card">
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <MessageCircle className="w-5 h-5 text-primary" />
-              Vrienden (chatten mogelijk)
+              Vrienden
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {mutualFollowers.map((friend) => (
-                <div key={friend.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarImage src={friend.avatar || undefined} />
-                      <AvatarFallback>{friend.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <span className="font-medium">{friend.name}</span>
-                  </div>
-                  <Button size="sm" onClick={() => handleStartChat(friend)}>
-                    <MessageCircle className="w-4 h-4 mr-1" />
-                    Chat
-                  </Button>
+          <CardContent className="space-y-2">
+            {mutualFollowers.map((friend) => (
+              <div 
+                key={friend.id} 
+                className="flex items-center justify-between p-3 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Avatar className="w-10 h-10">
+                    <AvatarImage src={friend.avatar || undefined} />
+                    <AvatarFallback>{friend.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <span className="font-medium">{friend.name}</span>
                 </div>
-              ))}
-            </div>
+                <Button 
+                  size="sm" 
+                  onClick={() => handleStartChat(friend)}
+                  className="rounded-xl"
+                >
+                  <MessageCircle className="w-4 h-4 mr-1" />
+                  Chat
+                </Button>
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}
 
-      {/* Violation History */}
+      {/* Violations */}
       {violations.length > 0 && (
         <Collapsible open={showViolations} onOpenChange={setShowViolations}>
           <Card className="shadow-card border-destructive/20">
@@ -279,26 +324,22 @@ export const ProfileTab = () => {
               </CardHeader>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <CardContent className="pt-0">
-                <p className="text-sm text-muted-foreground mb-4">
+              <CardContent className="pt-0 space-y-3">
+                <p className="text-sm text-muted-foreground">
                   Na 3 waarschuwingen wordt je account geblokkeerd.
                 </p>
-                <div className="space-y-3">
-                  {violations.map((violation) => (
-                    <div key={violation.id} className="p-3 bg-destructive/10 rounded-lg border border-destructive/20">
-                      <p className="text-sm font-medium text-destructive">{violation.violation_reason}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(violation.created_at).toLocaleDateString('nl-NL', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+                {violations.map((violation) => (
+                  <div key={violation.id} className="p-3 bg-destructive/10 rounded-xl border border-destructive/20">
+                    <p className="text-sm font-medium text-destructive">{violation.violation_reason}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {new Date(violation.created_at).toLocaleDateString('nl-NL', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                ))}
               </CardContent>
             </CollapsibleContent>
           </Card>
