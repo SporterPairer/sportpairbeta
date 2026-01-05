@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { BottomNav } from '@/components/BottomNav';
 import { HomeTab } from '@/components/HomeTab';
-import { ClubsTab } from '@/components/ClubsTab';
+import { GroupsTab } from '@/components/GroupsTab';
+import { AssociationsTab } from '@/components/AssociationsTab';
 import { LeaderboardTab } from '@/components/LeaderboardTab';
 import { FeedTab } from '@/components/FeedTab';
 import { ProfileTab } from '@/components/ProfileTab';
@@ -56,11 +57,16 @@ const Index = () => {
       </header>
 
       <main className="container max-w-lg mx-auto px-4 pt-4 pb-28">
-        {activeTab === 'home' && <HomeTab />}
+        {activeTab === 'home' && (
+          <HomeTab 
+            onNavigateToMessages={() => setActiveTab('messages')} 
+            onNavigateToGroups={() => setActiveTab('groups')}
+          />
+        )}
         {activeTab === 'discover' && <DiscoverTab />}
-        {activeTab === 'clubs' && <ClubsTab />}
+        {activeTab === 'groups' && <GroupsTab />}
+        {activeTab === 'associations' && <AssociationsTab />}
         {activeTab === 'messages' && <MessagesTab />}
-        {activeTab === 'leaderboard' && <LeaderboardTab />}
         {activeTab === 'profile' && <ProfileTab />}
       </main>
       
