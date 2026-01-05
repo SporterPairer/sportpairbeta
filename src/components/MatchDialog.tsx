@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { mockClubs } from '@/data/mockData';
-import { SPORTS, LEVELS, Sport, Level, Club } from '@/types';
+import { SPORTS, LEVELS, Sport, Level } from '@/types';
 import { cn } from '@/lib/utils';
-import { Check, Loader2, Search, X } from 'lucide-react';
+import { Check, Loader2, Search, X, MessageCircle, UserCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,22 +13,32 @@ import { Label } from '@/components/ui/label';
 interface MatchDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onNavigateToMessages?: () => void;
 }
 
-export function MatchDialog({ open, onOpenChange }: MatchDialogProps) {
+interface MatchedUser {
+  id: string;
+  name: string;
+  avatar: string | null;
+  level: string | null;
+}
+
+export function MatchDialog({ open, onOpenChange, onNavigateToMessages }: MatchDialogProps) {
   const [isSearching, setIsSearching] = useState(false);
+  const [isMatched, setIsMatched] = useState(false);
+  const [matchedUser, setMatchedUser] = useState<MatchedUser | null>(null);
   const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
   const [selectedLevel, setSelectedLevel] = useState<Level | null>(null);
-  const [selectedClub, setSelectedClub] = useState<Club | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { profile } = useAuth();
 
   const reset = () => {
     setIsSearching(false);
+    setIsMatched(false);
+    setMatchedUser(null);
     setSelectedSport(null);
     setSelectedLevel(null);
-    setSelectedClub(null);
     setIsSubmitting(false);
   };
 
@@ -37,6 +46,49 @@ export function MatchDialog({ open, onOpenChange }: MatchDialogProps) {
     onOpenChange(false);
     setTimeout(reset, 300);
   };
+
+  // Listen for match updates
+  useEffect(() => {
+    if (!profile || !isSearching) return;
+
+    const channel = supabase
+      .channel('match-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'match_requests',
+          filter: `user_id=eq.${profile.id}`,
+        },
+        async (payload) => {
+          const updatedRequest = payload.new as any;
+          if (updatedRequest.status === 'matched' && updatedRequest.matched_with_id) {
+            // Fetch matched user profile
+            const { data: matchedProfile } = await supabase
+              .from('profiles')
+              .select('id, name, avatar, level')
+              .eq('id', updatedRequest.matched_with_id)
+              .single();
+
+            if (matchedProfile) {
+              setMatchedUser(matchedProfile);
+              setIsMatched(true);
+              setIsSearching(false);
+              toast({
+                title: "Match gevonden! 🎉",
+                description: `Je bent gematcht met ${matchedProfile.name}`,
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile, isSearching, toast]);
 
   const createMatchRequest = async () => {
     if (!profile || !selectedSport || !selectedLevel) {
@@ -66,25 +118,84 @@ export function MatchDialog({ open, onOpenChange }: MatchDialogProps) {
           .eq('id', existingRequest.id);
       }
 
-      // Create new match request
-      const { error } = await supabase
+      // Check for existing compatible match requests
+      const { data: compatibleRequests } = await supabase
         .from('match_requests')
-        .insert({
-          user_id: profile.id,
-          sport: selectedSport,
-          level: selectedLevel,
-          age_group: 'all',
-          club_name: selectedClub?.name || null,
-          status: 'searching'
+        .select(`
+          id,
+          user_id,
+          profiles:user_id (
+            id,
+            name,
+            avatar,
+            level
+          )
+        `)
+        .eq('sport', selectedSport)
+        .eq('level', selectedLevel)
+        .eq('status', 'searching')
+        .neq('user_id', profile.id)
+        .limit(1);
+
+      if (compatibleRequests && compatibleRequests.length > 0) {
+        const matchedRequest = compatibleRequests[0];
+        const matchedProfile = matchedRequest.profiles as unknown as MatchedUser;
+
+        // Update both requests to matched
+        await supabase
+          .from('match_requests')
+          .update({ 
+            status: 'matched', 
+            matched_with_id: profile.id,
+            matched_at: new Date().toISOString()
+          })
+          .eq('id', matchedRequest.id);
+
+        // Create our request as already matched
+        await supabase
+          .from('match_requests')
+          .insert({
+            user_id: profile.id,
+            sport: selectedSport,
+            level: selectedLevel,
+            age_group: 'all',
+            status: 'matched',
+            matched_with_id: matchedRequest.user_id,
+            matched_at: new Date().toISOString()
+          });
+
+        // Create mutual follows so they can message each other
+        await supabase
+          .from('follows')
+          .upsert([
+            { follower_id: profile.id, following_id: matchedRequest.user_id },
+            { follower_id: matchedRequest.user_id, following_id: profile.id }
+          ], { onConflict: 'follower_id,following_id' });
+
+        setMatchedUser(matchedProfile);
+        setIsMatched(true);
+        toast({
+          title: "Match gevonden! 🎉",
+          description: `Je bent gematcht met ${matchedProfile.name}`,
         });
+      } else {
+        // Create new match request
+        await supabase
+          .from('match_requests')
+          .insert({
+            user_id: profile.id,
+            sport: selectedSport,
+            level: selectedLevel,
+            age_group: 'all',
+            status: 'searching'
+          });
 
-      if (error) throw error;
-
-      setIsSearching(true);
-      toast({
-        title: "Zoekverzoek aangemaakt! 🔍",
-        description: "Andere sporters krijgen nu een melding.",
-      });
+        setIsSearching(true);
+        toast({
+          title: "Zoekverzoek aangemaakt! 🔍",
+          description: "Andere sporters krijgen nu een melding.",
+        });
+      }
     } catch (error) {
       console.error('Error creating match request:', error);
       toast({
@@ -117,6 +228,13 @@ export function MatchDialog({ open, onOpenChange }: MatchDialogProps) {
     }
   };
 
+  const handleMessageMatch = () => {
+    handleClose();
+    if (onNavigateToMessages) {
+      onNavigateToMessages();
+    }
+  };
+
   const canSubmit = !!selectedSport && !!selectedLevel;
 
   return (
@@ -124,12 +242,61 @@ export function MatchDialog({ open, onOpenChange }: MatchDialogProps) {
       <DialogContent className="max-w-md gap-0 p-0 overflow-hidden">
         <DialogHeader className="p-6 pb-4 gradient-primary">
           <DialogTitle className="text-xl text-primary-foreground">
-            {isSearching ? 'Zoeken naar match...' : 'Zoek een sportmaatje'}
+            {isMatched ? 'Match gevonden!' : isSearching ? 'Zoeken naar match...' : 'Zoek een sportmaatje'}
           </DialogTitle>
         </DialogHeader>
 
         <div className="p-6 max-h-[70vh] overflow-y-auto">
-          {!isSearching ? (
+          {isMatched && matchedUser ? (
+            /* Match Found State */
+            <div className="flex flex-col items-center gap-6 py-4">
+              <div className="relative">
+                <div className="absolute -inset-4 rounded-full bg-primary/20 blur-xl animate-pulse" />
+                <img
+                  src={matchedUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${matchedUser.id}`}
+                  alt={matchedUser.name}
+                  className="relative h-24 w-24 rounded-full border-4 border-primary shadow-lg"
+                />
+                <div className="absolute -bottom-2 -right-2 h-10 w-10 rounded-full bg-primary flex items-center justify-center">
+                  <UserCheck className="h-5 w-5 text-primary-foreground" />
+                </div>
+              </div>
+              
+              <div className="text-center">
+                <h3 className="text-2xl font-bold mb-1">{matchedUser.name}</h3>
+                <p className="text-muted-foreground">
+                  {LEVELS.find(l => l.value === matchedUser.level)?.label || 'Onbekend niveau'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 rounded-full bg-secondary px-4 py-2">
+                <span className="text-lg">
+                  {SPORTS.find(s => s.value === selectedSport)?.emoji}
+                </span>
+                <span className="font-medium">
+                  {SPORTS.find(s => s.value === selectedSport)?.label}
+                </span>
+              </div>
+
+              <div className="w-full space-y-2">
+                <Button 
+                  variant="gradient" 
+                  className="w-full" 
+                  onClick={handleMessageMatch}
+                >
+                  <MessageCircle className="mr-2 h-5 w-5" />
+                  Stuur een bericht
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={handleClose}
+                >
+                  Sluiten
+                </Button>
+              </div>
+            </div>
+          ) : !isSearching ? (
             <div className="space-y-6">
               {/* Sport Selection */}
               <div className="space-y-2">
@@ -179,33 +346,6 @@ export function MatchDialog({ open, onOpenChange }: MatchDialogProps) {
                   ))}
                 </div>
               </div>
-
-              {/* Club Selection (Optional) */}
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold">Club (optioneel)</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {mockClubs.slice(0, 4).map((club) => (
-                    <Card
-                      key={club.id}
-                      className={cn(
-                        "cursor-pointer transition-all hover:shadow-md",
-                        selectedClub?.id === club.id && "ring-2 ring-primary shadow-glow"
-                      )}
-                      onClick={() => setSelectedClub(selectedClub?.id === club.id ? null : club)}
-                    >
-                      <CardContent className="flex items-center gap-2 p-3">
-                        <span className="text-xl">{club.emoji}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{club.name}</p>
-                        </div>
-                        {selectedClub?.id === club.id && (
-                          <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
             </div>
           ) : (
             /* Searching State */
@@ -243,7 +383,7 @@ export function MatchDialog({ open, onOpenChange }: MatchDialogProps) {
           )}
         </div>
 
-        {!isSearching && (
+        {!isSearching && !isMatched && (
           <div className="border-t border-border p-4">
             <Button 
               variant="gradient" 

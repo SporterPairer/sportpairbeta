@@ -1,18 +1,72 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { MatchDialog } from '@/components/MatchDialog';
-import { mockClubs } from '@/data/mockData';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Play, Users, Trophy, Activity, ChevronRight } from 'lucide-react';
 import sportpairLogo from '@/assets/sportpair-logo.png';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
-export function HomeTab() {
+interface HomeTabProps {
+  onNavigateToMessages?: () => void;
+  onNavigateToGroups?: () => void;
+}
+
+interface Group {
+  id: string;
+  name: string;
+  emoji: string;
+  member_count?: number;
+}
+
+export function HomeTab({ onNavigateToMessages, onNavigateToGroups }: HomeTabProps) {
   const [matchDialogOpen, setMatchDialogOpen] = useState(false);
+  const [groups, setGroups] = useState<Group[]>([]);
   const { profile } = useAuth();
 
   const displayName = profile?.name?.split(' ')[0] || 'Gebruiker';
+
+  useEffect(() => {
+    if (profile) {
+      fetchGroups();
+    }
+  }, [profile]);
+
+  const fetchGroups = async () => {
+    if (!profile) return;
+    
+    try {
+      const { data: memberData } = await supabase
+        .from('group_members')
+        .select('group_id')
+        .eq('profile_id', profile.id);
+
+      if (memberData && memberData.length > 0) {
+        const groupIds = memberData.map(m => m.group_id);
+        const { data: groupsData } = await supabase
+          .from('groups')
+          .select('id, name, emoji')
+          .in('id', groupIds)
+          .limit(3);
+
+        if (groupsData) {
+          const groupsWithCounts = await Promise.all(
+            groupsData.map(async (group) => {
+              const { count } = await supabase
+                .from('group_members')
+                .select('*', { count: 'exact', head: true })
+                .eq('group_id', group.id);
+              return { ...group, member_count: count || 0 };
+            })
+          );
+          setGroups(groupsWithCounts);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching groups:', error);
+    }
+  };
 
   return (
     <div className="space-y-6 pb-24">
@@ -80,49 +134,62 @@ export function HomeTab() {
             <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 mb-2">
               <Users className="h-5 w-5 text-primary" />
             </div>
-            <p className="text-2xl font-bold">{mockClubs.length}</p>
-            <p className="text-xs text-muted-foreground">Clubs</p>
+            <p className="text-2xl font-bold">{groups.length}</p>
+            <p className="text-xs text-muted-foreground">Groepen</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* My Clubs */}
+      {/* My Groups */}
       <div className="animate-slide-up stagger-3 opacity-0">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold">Mijn Clubs</h3>
-          <Button variant="ghost" size="sm" className="text-primary text-sm">
+          <h3 className="font-semibold">Mijn Groepen</h3>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-primary text-sm"
+            onClick={onNavigateToGroups}
+          >
             Alle bekijken
             <ChevronRight className="w-4 h-4 ml-1" />
           </Button>
         </div>
-        <div className="space-y-3">
-          {mockClubs.slice(0, 3).map((club) => (
-            <Card key={club.id} className="hover:shadow-card transition-all duration-200 border-0 shadow-soft">
-              <CardContent className="flex items-center gap-4 p-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-xl">
-                  {club.emoji}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold truncate">{club.name}</p>
-                  <p className="text-sm text-muted-foreground">{club.memberCount} leden</p>
-                </div>
-                <div className="flex -space-x-2">
-                  {club.members.slice(0, 3).map((member) => (
-                    <img
-                      key={member.id}
-                      src={member.avatar}
-                      alt={member.name}
-                      className="h-8 w-8 rounded-full border-2 border-background bg-muted object-cover"
-                    />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {groups.length > 0 ? (
+          <div className="space-y-3">
+            {groups.map((group) => (
+              <Card key={group.id} className="hover:shadow-card transition-all duration-200 border-0 shadow-soft">
+                <CardContent className="flex items-center gap-4 p-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-xl">
+                    {group.emoji}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold truncate">{group.name}</p>
+                    <p className="text-sm text-muted-foreground">{group.member_count} leden</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card className="border-dashed border-2">
+            <CardContent className="flex flex-col items-center gap-2 p-6 text-center">
+              <Users className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Je hebt nog geen groepen
+              </p>
+              <Button variant="outline" size="sm" onClick={onNavigateToGroups}>
+                Groep maken
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      <MatchDialog open={matchDialogOpen} onOpenChange={setMatchDialogOpen} />
+      <MatchDialog 
+        open={matchDialogOpen} 
+        onOpenChange={setMatchDialogOpen} 
+        onNavigateToMessages={onNavigateToMessages}
+      />
     </div>
   );
 }

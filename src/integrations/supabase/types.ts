@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      association_members: {
+        Row: {
+          association_id: string
+          id: string
+          joined_at: string
+          profile_id: string
+          role: string
+        }
+        Insert: {
+          association_id: string
+          id?: string
+          joined_at?: string
+          profile_id: string
+          role?: string
+        }
+        Update: {
+          association_id?: string
+          id?: string
+          joined_at?: string
+          profile_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "association_members_association_id_fkey"
+            columns: ["association_id"]
+            isOneToOne: false
+            referencedRelation: "sport_associations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       banned_users: {
         Row: {
           banned_at: string
@@ -70,6 +102,159 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      group_activities: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          group_id: string
+          id: string
+          location: string | null
+          scheduled_at: string | null
+          sport: string
+          status: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          group_id: string
+          id?: string
+          location?: string | null
+          scheduled_at?: string | null
+          sport: string
+          status?: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          group_id?: string
+          id?: string
+          location?: string | null
+          scheduled_at?: string | null
+          sport?: string
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_activities_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_activity_participants: {
+        Row: {
+          activity_id: string
+          id: string
+          joined_at: string
+          profile_id: string
+          result: string | null
+          score: string | null
+          status: string
+        }
+        Insert: {
+          activity_id: string
+          id?: string
+          joined_at?: string
+          profile_id: string
+          result?: string | null
+          score?: string | null
+          status?: string
+        }
+        Update: {
+          activity_id?: string
+          id?: string
+          joined_at?: string
+          profile_id?: string
+          result?: string | null
+          score?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_activity_participants_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "group_activities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_members: {
+        Row: {
+          group_id: string
+          id: string
+          joined_at: string
+          profile_id: string
+          role: string
+        }
+        Insert: {
+          group_id: string
+          id?: string
+          joined_at?: string
+          profile_id: string
+          role?: string
+        }
+        Update: {
+          group_id?: string
+          id?: string
+          joined_at?: string
+          profile_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      groups: {
+        Row: {
+          created_at: string
+          description: string | null
+          emoji: string
+          id: string
+          invite_code: string
+          max_members: number
+          name: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          emoji?: string
+          id?: string
+          invite_code?: string
+          max_members?: number
+          name: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          emoji?: string
+          id?: string
+          invite_code?: string
+          max_members?: number
+          name?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       match_requests: {
         Row: {
@@ -247,6 +432,51 @@ export type Database = {
           sport_hours?: number | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      sport_associations: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          join_code: string
+          logo_url: string | null
+          name: string
+          owner_id: string
+          price_per_member: number
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          join_code?: string
+          logo_url?: string | null
+          name: string
+          owner_id: string
+          price_per_member?: number
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          join_code?: string
+          logo_url?: string | null
+          name?: string
+          owner_id?: string
+          price_per_member?: number
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
